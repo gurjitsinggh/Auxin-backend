@@ -1,14 +1,14 @@
 [variables]
 NODE_ENV = 'production'
-NPM_CONFIG_PRODUCTION = ''
+NPM_CONFIG_PRODUCTION = 'false'
 NPM_CONFIG_FUND = 'false'
 NPM_CONFIG_AUDIT = 'false'
 
 [phases.install]
-cmds = ['npm ci']
+cmds = ['npm ci --omit=dev']
 
 [phases.build]
-cmds = ['npm run build', 'npm prune --omit=dev']
+cmds = ['npm run build']
 
 [start]
 cmd = 'npm run start:prod'
