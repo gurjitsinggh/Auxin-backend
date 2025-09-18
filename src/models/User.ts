@@ -32,8 +32,7 @@ const UserSchema = new Schema<IUser>({
     select: false // Don't include password in queries by default
   },
   googleId: {
-    type: String,
-    sparse: true // Allows multiple null values
+    type: String
   },
   avatar: {
     type: String,
@@ -58,6 +57,6 @@ const UserSchema = new Schema<IUser>({
 
 // Index for better query performance
 UserSchema.index({ email: 1 });
-UserSchema.index({ googleId: 1 });
+UserSchema.index({ googleId: 1 }, { sparse: true }); // Sparse index allows multiple null values
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

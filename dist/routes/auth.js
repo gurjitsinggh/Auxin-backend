@@ -1,14 +1,9 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const User_1 = __importDefault(require("../models/User"));
-const jwt_1 = require("../lib/jwt");
-const googleAuth_1 = require("../lib/googleAuth");
-const router = express_1.default.Router();
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import User from '../models/User.js';
+import { generateToken, verifyToken } from '../lib/jwt.js';
+import { getGoogleAuthURL, getGoogleUserInfo } from '../lib/googleAuth.js';
+const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
     try {
@@ -23,15 +18,15 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
         // Check if user already exists
-        const existingUser = await User_1.default.findOne({ email });
+        const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: 'User already exists with this email' });
         }
         // Hash password
         const saltRounds = 12;
-        const hashedPassword = await bcryptjs_1.default.hash(password, saltRounds);
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
         // Create user
-        const user = new User_1.default({
+        const user = new User({
             name,
             email,
             password: hashedPassword,
@@ -39,7 +34,7 @@ router.post('/register', async (req, res) => {
         });
         await user.save();
         // Generate token
-        const token = (0, jwt_1.generateToken)(user);
+        const token = generateToken(user);
         res.status(201).json({
             message: 'User created successfully',
             token,
@@ -71,17 +66,17 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
         // Find user and include password
-        const user = await User_1.default.findOne({ email }).select('+password');
+        const user = await User.findOne({ email }).select('+password');
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         // Check password
-        const isPasswordValid = await bcryptjs_1.default.compare(password, user.password);
+        const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         // Generate token
-        const token = (0, jwt_1.generateToken)(user);
+        const token = generateToken(user);
         res.json({
             message: 'Login successful',
             token,
@@ -105,7 +100,7 @@ router.post('/login', async (req, res) => {
 // Google OAuth - Get auth URL
 router.get('/google', (_req, res) => {
     try {
-        const authURL = (0, googleAuth_1.getGoogleAuthURL)();
+        const authURL = getGoogleAuthURL();
         res.json({ authURL });
     }
     catch (error) {
@@ -121,9 +116,9 @@ router.post('/google/callback', async (req, res) => {
             return res.status(400).json({ error: 'Authorization code is required' });
         }
         // Get user info from Google
-        const googleUser = await (0, googleAuth_1.getGoogleUserInfo)(code);
+        const googleUser = await getGoogleUserInfo(code);
         // Check if user exists
-        let user = await User_1.default.findOne({
+        let user = await User.findOne({
             $or: [
                 { email: googleUser.email },
                 { googleId: googleUser.googleId }
@@ -139,7 +134,7 @@ router.post('/google/callback', async (req, res) => {
         }
         else {
             // Create new user
-            user = new User_1.default({
+            user = new User({
                 name: googleUser.name,
                 email: googleUser.email,
                 googleId: googleUser.googleId,
@@ -149,7 +144,7 @@ router.post('/google/callback', async (req, res) => {
             await user.save();
         }
         // Generate token
-        const token = (0, jwt_1.generateToken)(user);
+        const token = generateToken(user);
         res.json({
             message: 'Google authentication successful',
             token,
@@ -175,8 +170,8 @@ router.get('/verify', async (req, res) => {
             return res.status(401).json({ error: 'No token provided' });
         }
         const token = authHeader.substring(7);
-        const decoded = (0, jwt_1.verifyToken)(token);
-        const user = await User_1.default.findById(decoded.userId);
+        const decoded = verifyToken(token);
+        const user = await User.findById(decoded.userId);
         if (!user) {
             return res.status(401).json({ error: 'User not found' });
         }
@@ -199,5 +194,5 @@ router.get('/verify', async (req, res) => {
 router.post('/logout', (_req, res) => {
     res.json({ message: 'Logout successful' });
 });
-exports.default = router;
+export default router;
 //# sourceMappingURL=auth.js.map

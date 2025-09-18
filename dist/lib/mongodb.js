@@ -1,9 +1,4 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const mongoose_1 = __importDefault(require("mongoose"));
+import mongoose from 'mongoose';
 const getMongoURI = () => {
     const MONGODB_URI = process.env.NODE_ENV === 'production'
         ? process.env.MONGODB_URI_PROD
@@ -26,7 +21,7 @@ async function connectDB() {
             bufferCommands: false,
         };
         const MONGODB_URI = getMongoURI();
-        cached.promise = mongoose_1.default.connect(MONGODB_URI, opts).then((mongoose) => {
+        cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
             console.log('✅ Connected to MongoDB');
             return mongoose;
         });
@@ -40,5 +35,5 @@ async function connectDB() {
     }
     return cached.conn;
 }
-exports.default = connectDB;
+export default connectDB;
 //# sourceMappingURL=mongodb.js.map

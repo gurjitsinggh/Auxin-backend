@@ -1,8 +1,8 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import User from '../models/User';
-import { generateToken, verifyToken } from '../lib/jwt';
-import { getGoogleAuthURL, getGoogleUserInfo } from '../lib/googleAuth';
+import User from '../models/User.js';
+import { generateToken, verifyToken } from '../lib/jwt.js';
+import { getGoogleAuthURL, getGoogleUserInfo } from '../lib/googleAuth.js';
 
 const router = express.Router();
 

@@ -1,11 +1,11 @@
 // Load environment variables FIRST
 import dotenv from 'dotenv';
-dotenv.config({ path: '../../.env' });
+dotenv.config({ quiet: true });
 
 import express from 'express';
 import cors from 'cors';
-import connectDB from './lib/mongodb';
-import authRoutes from './routes/auth';
+import connectDB from './lib/mongodb.js';
+import authRoutes from './routes/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
