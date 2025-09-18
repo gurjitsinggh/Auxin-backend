@@ -1,10 +1,11 @@
 [variables]
 NODE_ENV = 'production'
+NPM_CONFIG_PRODUCTION = ''
 NPM_CONFIG_FUND = 'false'
 NPM_CONFIG_AUDIT = 'false'
 
 [phases.install]
-cmds = ['npm ci --omit=dev --no-audit --no-fund']
+cmds = ['./scripts/install-deps.sh']
 
 [phases.build]
 cmds = ['npm run build']
