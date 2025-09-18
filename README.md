@@ -70,3 +70,4 @@ The backend uses environment variables from the root `.env` file:
 - `POST /api/auth/google/callback` - Google OAuth callback
 - `GET /api/auth/me` - Get current user
 - `GET /api/health` - Health check
+# Force redeploy
