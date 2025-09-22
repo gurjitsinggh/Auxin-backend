@@ -47,7 +47,12 @@ export const getGoogleUserInfo = async (code: string) => {
       throw new Error('Failed to fetch user info from Google');
     }
 
-    const userInfo: any = await response.json();
+    const userInfo = await response.json() as {
+      id: string;
+      email: string;
+      name: string;
+      picture: string;
+    };
     
     return {
       googleId: userInfo.id,

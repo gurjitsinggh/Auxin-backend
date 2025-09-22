@@ -1,4 +1,4 @@
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { IUser } from '../models/User.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
@@ -20,17 +20,14 @@ export const generateToken = (user: IUser): string => {
     email: user.email
   };
 
-  const options: SignOptions = {
-    expiresIn: JWT_EXPIRES_IN as any
-  };
-
-  return jwt.sign(payload, secretKey, options);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return jwt.sign(payload, secretKey, { expiresIn: JWT_EXPIRES_IN } as any);
 };
 
 export const verifyToken = (token: string): JWTPayload => {
   try {
     return jwt.verify(token, secretKey) as JWTPayload;
-  } catch (error) {
+  } catch {
     throw new Error('Invalid or expired token');
   }
 };
@@ -41,19 +38,15 @@ export const generateRefreshToken = (user: IUser): string => {
     type: 'refresh'
   };
 
-  const options: SignOptions = {
-    expiresIn: '30d' as any
-  };
-
-  return jwt.sign(payload, secretKey, options);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return jwt.sign(payload, secretKey, { expiresIn: '30d' } as any);
 };
 
 // Decode JWT token without verification (for debugging/inspection)
 export const decodeToken = (token: string): JWTPayload | null => {
   try {
     return jwt.decode(token) as JWTPayload;
-  } catch (error) {
-    console.error('Error decoding token:', error);
+  } catch {
     return null;
   }
 };
@@ -66,7 +59,7 @@ export const isTokenExpired = (token: string): boolean => {
     
     const currentTime = Math.floor(Date.now() / 1000);
     return decoded.exp < currentTime;
-  } catch (error) {
+  } catch {
     return true;
   }
 };
@@ -78,7 +71,7 @@ export const getTokenExpiration = (token: string): Date | null => {
     if (!decoded || !decoded.exp) return null;
     
     return new Date(decoded.exp * 1000);
-  } catch (error) {
+  } catch {
     return null;
   }
 };

@@ -8,16 +8,14 @@ export const generateToken = (user) => {
         userId: user._id,
         email: user.email
     };
-    const options = {
-        expiresIn: JWT_EXPIRES_IN
-    };
-    return jwt.sign(payload, secretKey, options);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return jwt.sign(payload, secretKey, { expiresIn: JWT_EXPIRES_IN });
 };
 export const verifyToken = (token) => {
     try {
         return jwt.verify(token, secretKey);
     }
-    catch (error) {
+    catch {
         throw new Error('Invalid or expired token');
     }
 };
@@ -26,18 +24,15 @@ export const generateRefreshToken = (user) => {
         userId: user._id,
         type: 'refresh'
     };
-    const options = {
-        expiresIn: '30d'
-    };
-    return jwt.sign(payload, secretKey, options);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return jwt.sign(payload, secretKey, { expiresIn: '30d' });
 };
 // Decode JWT token without verification (for debugging/inspection)
 export const decodeToken = (token) => {
     try {
         return jwt.decode(token);
     }
-    catch (error) {
-        console.error('Error decoding token:', error);
+    catch {
         return null;
     }
 };
@@ -50,7 +45,7 @@ export const isTokenExpired = (token) => {
         const currentTime = Math.floor(Date.now() / 1000);
         return decoded.exp < currentTime;
     }
-    catch (error) {
+    catch {
         return true;
     }
 };
@@ -62,7 +57,7 @@ export const getTokenExpiration = (token) => {
             return null;
         return new Date(decoded.exp * 1000);
     }
-    catch (error) {
+    catch {
         return null;
     }
 };
