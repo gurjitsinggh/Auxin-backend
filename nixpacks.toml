@@ -5,10 +5,10 @@ NPM_CONFIG_FUND = 'false'
 NPM_CONFIG_AUDIT = 'false'
 
 [phases.install]
-cmds = ['npm ci --omit=dev']
+cmds = ['npm ci']
 
 [phases.build]
 cmds = ['npm run build']
 
 [start]
-cmd = 'npm run start:prod'
+cmd = 'NODE_ENV=production node dist/server.js'
