@@ -24,15 +24,22 @@ const allowedOrigins = [
 ].filter(Boolean); // Remove null values
 const corsOptions = {
     origin: (origin, callback) => {
+        // Debug logging
+        console.log(`🔍 CORS check for origin: ${origin}`);
+        console.log(`🔍 Allowed origins: ${JSON.stringify(allowedOrigins)}`);
+        console.log(`🔍 NODE_ENV: ${process.env.NODE_ENV}`);
+        console.log(`🔍 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin)
             return callback(null, true);
         // Check if the origin is in our allowed list
         if (allowedOrigins.includes(origin)) {
+            console.log(`✅ CORS allowed for origin: ${origin}`);
             callback(null, true);
         }
         else {
             console.warn(`🚫 CORS blocked request from unauthorized origin: ${origin}`);
+            console.warn(`🔍 Available origins: ${allowedOrigins.join(', ')}`);
             callback(new Error('Not allowed by CORS - Unauthorized origin'));
         }
     },
@@ -52,6 +59,8 @@ const corsOptions = {
     optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
 app.use(cors(corsOptions));
+// Explicit OPTIONS handler for preflight requests
+app.options('*', cors(corsOptions));
 // Use Helmet for enhanced security headers
 app.use(helmet({
     contentSecurityPolicy: {
