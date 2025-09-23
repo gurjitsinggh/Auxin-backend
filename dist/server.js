@@ -11,13 +11,17 @@ import authRoutes from './routes/auth.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 // CORS Security Configuration
+const isProduction = process.env.NODE_ENV === 'production';
 const allowedOrigins = [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
-    'http://localhost:3000', // Development frontend
-    'http://localhost:5173', // Vite dev server
-    // Add your production domains here
-    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
-];
+    // Always include the configured frontend URL
+    process.env.FRONTEND_URL || (isProduction ? 'https://auxin.media' : 'http://localhost:5173'),
+    // Only include development origins in non-production
+    ...(isProduction ? [] : ['http://localhost:3000', 'http://localhost:5173']),
+    // Add any additional production domains
+    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
+    // Explicitly include auxin.media for production
+    ...(isProduction ? ['https://auxin.media'] : [])
+].filter(Boolean); // Remove null values
 const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
@@ -172,9 +176,22 @@ app.use((_req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 app.listen(PORT, () => {
+    const environment = process.env.NODE_ENV || 'development';
+    const frontendUrl = process.env.FRONTEND_URL || (isProduction ? 'NOT SET' : 'http://localhost:5173');
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📱 Frontend URL: ${frontendUrl}`);
+    console.log(`🌍 Environment: ${environment}`);
+    if (isProduction) {
+        console.log(`🔒 CORS Origins: ${allowedOrigins.join(', ')}`);
+        console.log(`🗄️  Database: Using MONGODB_URI_PROD`);
+        if (!process.env.FRONTEND_URL) {
+            console.warn(`⚠️  WARNING: FRONTEND_URL not set in production!`);
+        }
+    }
+    else {
+        console.log(`🔓 Development mode - allowing localhost origins`);
+        console.log(`🗄️  Database: Using MONGODB_URI`);
+    }
 });
 export default app;
 //# sourceMappingURL=server.js.map
