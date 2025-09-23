@@ -5,7 +5,7 @@ NPM_CONFIG_FUND = 'false'
 NPM_CONFIG_AUDIT = 'false'
 
 [phases.install]
-cmds = ['npm ci']
+cmds = ['npm ci --no-cache']
 
 [phases.build]
 cmds = ['npm run build']

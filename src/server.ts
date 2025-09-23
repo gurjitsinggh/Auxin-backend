@@ -66,9 +66,6 @@ const corsOptions: cors.CorsOptions = {
 
 app.use(cors(corsOptions));
 
-// Explicit OPTIONS handler for preflight requests
-app.options('*', cors(corsOptions));
-
 // Use Helmet for enhanced security headers
 app.use(helmet({
   contentSecurityPolicy: {
