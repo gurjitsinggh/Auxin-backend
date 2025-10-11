@@ -117,7 +117,14 @@ router.post('/login', async (req, res) => {
 // Google OAuth - Get auth URL
 router.get('/google', (_req, res) => {
   try {
+    console.log('🔍 Google OAuth request received');
+    console.log('🔍 Environment variables check:');
+    console.log('🔍 GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
+    console.log('🔍 GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+    console.log('🔍 GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI);
+    
     const authURL = getGoogleAuthURL();
+    console.log('✅ Generated Google auth URL successfully');
     res.json({ authURL });
   } catch (error) {
     console.error('Google auth URL error:', error);
