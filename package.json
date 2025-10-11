@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "NODE_ENV=production node dist/server.js",
     "start:prod": "node dist/server.js",
     "install:prod": "npm ci --omit=dev",
     "lint": "eslint src/**/*.ts",

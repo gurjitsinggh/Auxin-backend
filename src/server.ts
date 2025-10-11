@@ -210,6 +210,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Frontend URL: ${frontendUrl}`);
   console.log(`🌍 Environment: ${environment}`);
+  console.log(`🔗 Backend URL: ${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}`);
   
   if (isProduction) {
     console.log(`🔒 CORS Origins: ${allowedOrigins.join(', ')}`);
