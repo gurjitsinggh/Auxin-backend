@@ -1,6 +1,0 @@
-# If you want to try Railway's auto-detection instead of nixpacks.toml:
-# 1. Delete nixpacks.toml
-# 2. Set these environment variables in Railway dashboard:
-#    NPM_CONFIG_PRODUCTION=
-#    NODE_ENV=production
-# 3. Railway will auto-detect and use package.json scripts

@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import xss from 'xss';
 import connectDB from './lib/mongodb.js';
 import authRoutes from './routes/auth.js';
+import appointmentRoutes from './routes/appointments.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -178,6 +179,7 @@ connectDB();
 
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
