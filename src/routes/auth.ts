@@ -114,25 +114,100 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Google OAuth - Get auth URL
+// Google OAuth - Redirect to Google (NEW PATTERN)
 router.get('/google', (_req, res) => {
   try {
-    console.log('🔍 Google OAuth request received');
+    console.log('🔍 Google OAuth redirect request received');
     console.log('🔍 Environment variables check:');
     console.log('🔍 GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
     console.log('🔍 GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
     console.log('🔍 GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI);
     
     const authURL = getGoogleAuthURL();
-    console.log('✅ Generated Google auth URL successfully');
-    res.json({ authURL });
+    console.log('✅ Redirecting to Google OAuth URL');
+    
+    // Redirect directly to Google instead of returning JSON
+    res.redirect(authURL);
   } catch (error) {
-    console.error('Google auth URL error:', error);
-    res.status(500).json({ error: 'Failed to generate Google auth URL' });
+    console.error('Google auth redirect error:', error);
+    const frontendURL = process.env.FRONTEND_URL || 'https://auxin.media';
+    res.redirect(`${frontendURL}/auth/google/callback?error=${encodeURIComponent('Failed to initiate Google authentication')}`);
   }
 });
 
-// Google OAuth - Callback
+// Google OAuth - Callback (GET route for Google's redirect)
+router.get('/google/callback', async (req, res) => {
+  try {
+    const { code, error } = req.query;
+    const frontendURL = process.env.FRONTEND_URL || 'https://auxin.media';
+
+    if (error) {
+      console.error('Google OAuth error:', error);
+      return res.redirect(`${frontendURL}/auth/google/callback?error=${encodeURIComponent(error as string)}`);
+    }
+
+    if (!code) {
+      console.error('No authorization code received from Google');
+      return res.redirect(`${frontendURL}/auth/google/callback?error=${encodeURIComponent('No authorization code received')}`);
+    }
+
+    console.log('🔍 Processing Google OAuth callback with code');
+
+    // Get user info from Google
+    const googleUser = await getGoogleUserInfo(code as string);
+
+    // Check if user exists
+    let user = await User.findOne({ 
+      $or: [
+        { email: googleUser.email },
+        { googleId: googleUser.googleId }
+      ]
+    });
+
+    if (user) {
+      // Update existing user with Google ID if not set
+      if (!user.googleId) {
+        user.googleId = googleUser.googleId;
+        user.avatar = googleUser.avatar;
+        await user.save();
+      }
+    } else {
+      // Create new user
+      user = new User({
+        name: googleUser.name,
+        email: googleUser.email,
+        googleId: googleUser.googleId,
+        avatar: googleUser.avatar,
+        isEmailVerified: true
+      });
+
+      await user.save();
+    }
+
+    // Generate token
+    const token = generateToken(user);
+
+    console.log('✅ Google OAuth successful for user:', user.email);
+
+    // Redirect back to frontend with user data and token
+    const userData = encodeURIComponent(JSON.stringify({
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      avatar: user.avatar,
+      isEmailVerified: user.isEmailVerified
+    }));
+    
+    res.redirect(`${frontendURL}/auth/google/callback?token=${token}&user=${userData}`);
+
+  } catch (error) {
+    console.error('Google callback error:', error);
+    const frontendURL = process.env.FRONTEND_URL || 'https://auxin.media';
+    res.redirect(`${frontendURL}/auth/google/callback?error=${encodeURIComponent('Authentication failed')}`);
+  }
+});
+
+// Google OAuth - Callback (POST route for fallback/legacy support)
 router.post('/google/callback', async (req, res) => {
   try {
     const { code } = req.body;

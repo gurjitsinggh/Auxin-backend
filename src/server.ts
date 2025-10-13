@@ -181,6 +181,9 @@ connectDB();
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/appointments', appointmentRoutes);
 
+// Add direct auth routes (without /api prefix) for OAuth redirects
+app.use('/auth', authLimiter, authRoutes);
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
