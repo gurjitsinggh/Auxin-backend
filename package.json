@@ -2,7 +2,7 @@
   "name": "auxin-backend",
   "version": "1.0.0",
   "description": "Backend API for Auxin Media",
-  "main": "src/server.ts",
+  "main": "server.js",
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
