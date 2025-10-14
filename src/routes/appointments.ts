@@ -75,7 +75,7 @@ router.get('/available', optionalAuth, async (req, res) => {
 // Book an appointment
 router.post('/book', authenticateToken, async (req, res) => {
   try {
-    const { date, time, userEmail, userName } = req.body;
+    const { date, time, userEmail, userName, timezone } = req.body;
     const userId = req.user!.userId;
 
     // Validation
@@ -171,6 +171,7 @@ router.post('/book', authenticateToken, async (req, res) => {
       userName,
       date: appointmentDate,
       time,
+      timezone: timezone || 'UTC', // Store user's timezone
       status: 'confirmed'
     });
 

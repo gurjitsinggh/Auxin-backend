@@ -73,22 +73,43 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log('🔐 Login attempt for email:', email);
 
     if (!email || !password) {
+      console.log('❌ Login failed: Missing email or password');
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
     // Find user and include password
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      console.log('❌ Login failed: User not found for email:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    console.log('✅ User found:', { 
+      id: user._id, 
+      email: user.email, 
+      hasPassword: !!user.password,
+      hasGoogleId: !!user.googleId 
+    });
+
+    // Check if user has a password (users created via Google OAuth might not have one)
+    if (!user.password) {
+      console.log('❌ Login failed: User has no password (Google OAuth account)');
+      return res.status(401).json({ 
+        error: 'This account was created with Google. Please use "Continue with Google" to sign in.' 
+      });
+    }
+
     // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password!);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      console.log('❌ Login failed: Invalid password for email:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    console.log('✅ Login successful for email:', email);
 
     // Generate token
     const token = generateToken(user);

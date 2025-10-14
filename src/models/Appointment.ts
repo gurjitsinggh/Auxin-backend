@@ -7,6 +7,7 @@ export interface IAppointment extends Document {
   userName: string;
   date: Date;
   time: string;
+  timezone?: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +63,11 @@ const AppointmentSchema = new Schema<IAppointment>({
       },
       message: 'Time must be in HH:MM format and within business hours (09:00-17:30) in 30-minute intervals'
     }
+  },
+  timezone: {
+    type: String,
+    default: 'UTC',
+    trim: true
   },
   status: {
     type: String,
