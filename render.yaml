@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     buildCommand: npm ci --no-cache
-    startCommand: node dist/server.js
+    startCommand: node dist/server-direct.js
     envVars:
       - key: NODE_ENV
         value: production
