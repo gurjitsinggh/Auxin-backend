@@ -1,5 +1,4 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { generateToken, verifyToken } from '../lib/jwt.js';
 import { getGoogleAuthURL, getGoogleUserInfo } from '../lib/googleAuth.js';
@@ -28,15 +27,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'User already exists with this email' });
     }
 
-    // Hash password
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    // Create user
+    // Create user with plain text password
     const user = new User({
       name,
       email,
-      password: hashedPassword,
+      password: password, // Store plain text password
       isEmailVerified: false
     });
 
@@ -80,8 +75,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Find user and include password
-    const user = await User.findOne({ email }).select('+password');
+    // Find user
+    const user = await User.findOne({ email });
     if (!user) {
       console.log('❌ Login failed: User not found for email:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -102,9 +97,8 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
+    // Check password (plain text comparison)
+    if (user.password !== password) {
       console.log('❌ Login failed: Invalid password for email:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
