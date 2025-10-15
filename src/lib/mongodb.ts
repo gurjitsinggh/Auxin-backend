@@ -1,20 +1,27 @@
 import mongoose from 'mongoose';
 
-console.log("DEBUG => Loaded Mongo URI:", process.env.MONGODB_URI_PROD);
-
 const getMongoURI = () => {
   const isProduction = process.env.NODE_ENV === 'production';
+  
+  // Debug: Log all available environment variables (MOVED INSIDE FUNCTION)
+  console.log('🔍 Environment Check:');
+  console.log('   NODE_ENV:', process.env.NODE_ENV);
+  console.log('   MONGODB_URI exists:', !!process.env.MONGODB_URI);
+  console.log('   MONGODB_URI_PROD exists:', !!process.env.MONGODB_URI_PROD);
+  console.log('   DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  console.log('   MONGO_URI exists:', !!process.env.MONGO_URI);
   
   // Try multiple environment variable names for flexibility
   const MONGODB_URI = process.env.MONGODB_URI || 
                      process.env.MONGODB_URI_PROD || 
                      process.env.DATABASE_URL ||
                      process.env.MONGO_URI;
-
-  console.log(`🔍 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🔍 Looking for MongoDB URI in: MONGODB_URI, MONGODB_URI_PROD, DATABASE_URL, MONGO_URI`);
   
   if (!MONGODB_URI) {
+    console.error('❌ Available environment variables:', Object.keys(process.env).filter(k => 
+      k.includes('MONGO') || k.includes('DATABASE')
+    ));
+    
     throw new Error(
       `❌ Missing MongoDB connection string!\n` +
       `Please define one of these environment variables:\n` +
@@ -25,10 +32,11 @@ const getMongoURI = () => {
       `Example: MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority`
     );
   }
-
+  
   // Mask the password in logs for security
   const maskedURI = MONGODB_URI.replace(/:([^:@]{1,}@)/, ':****@');
-  console.log(`🔗 MongoDB URI: ${maskedURI}`);
+  console.log(`🔗 Using MongoDB URI: ${maskedURI}`);
+  console.log(`🔗 URI length: ${MONGODB_URI.length} characters`);
   
   return MONGODB_URI;
 };
@@ -63,7 +71,7 @@ async function connectDB() {
       minPoolSize: 5,
     };
 
-    const MONGODB_URI = getMongoURI();
+    const MONGODB_URI = getMongoURI(); // This now logs debug info
     console.log('🔄 Connecting to MongoDB...');
     
     cached!.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
