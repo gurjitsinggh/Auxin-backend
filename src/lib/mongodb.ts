@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 
+console.log("DEBUG => Loaded Mongo URI:", process.env.MONGODB_URI_PROD);
+
 const getMongoURI = () => {
   const isProduction = process.env.NODE_ENV === 'production';
   
