@@ -150,6 +150,44 @@ router.get('/google', (_req, res) => {
   }
 });
 
+// Forgot Password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    console.log('🔐 Forgot password request for email:', email);
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    
+    // Always return success for security (don't reveal if email exists)
+    // In production, you would send an email here
+    console.log(`📧 Password reset requested for: ${email} (User exists: ${!!user})`);
+    
+    // TODO: Implement email sending logic here
+    // - Generate reset token
+    // - Save token to database with expiration
+    // - Send email with reset link
+    
+    res.json({
+      message: 'If an account with that email exists, password reset instructions have been sent.'
+    });
+
+  } catch (error) {
+    console.error('❌ Forgot password error:', error);
+    res.status(500).json({ error: 'An error occurred. Please try again.' });
+  }
+});
+
 // Google OAuth - Callback (GET route for Google's redirect)
 router.get('/google/callback', async (req, res) => {
   try {
