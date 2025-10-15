@@ -2,18 +2,25 @@ import mongoose from 'mongoose';
 
 const getMongoURI = () => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const MONGODB_URI = isProduction ? process.env.MONGODB_URI_PROD : process.env.MONGODB_URI;
+  
+  // Try multiple environment variable names for flexibility
+  const MONGODB_URI = process.env.MONGODB_URI || 
+                     process.env.MONGODB_URI_PROD || 
+                     process.env.DATABASE_URL ||
+                     process.env.MONGO_URI;
 
   console.log(`🔍 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🔍 Looking for MongoDB URI: ${isProduction ? 'MONGODB_URI_PROD' : 'MONGODB_URI'}`);
+  console.log(`🔍 Looking for MongoDB URI in: MONGODB_URI, MONGODB_URI_PROD, DATABASE_URL, MONGO_URI`);
   
   if (!MONGODB_URI) {
-    const envVar = isProduction ? 'MONGODB_URI_PROD' : 'MONGODB_URI';
     throw new Error(
       `❌ Missing MongoDB connection string!\n` +
-      `Please define the ${envVar} environment variable.\n` +
-      `Create a .env file in your backend directory with:\n` +
-      `${envVar}=mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority`
+      `Please define one of these environment variables:\n` +
+      `- MONGODB_URI (recommended)\n` +
+      `- MONGODB_URI_PROD\n` +
+      `- DATABASE_URL\n` +
+      `- MONGO_URI\n` +
+      `Example: MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority`
     );
   }
 

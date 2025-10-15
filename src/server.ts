@@ -219,13 +219,13 @@ app.listen(PORT, () => {
   
   if (isProduction) {
     console.log(`🔒 CORS Origins: ${allowedOrigins.join(', ')}`);
-    console.log(`🗄️  Database: Using MONGODB_URI_PROD`);
+    console.log(`🗄️  Database: Using production MongoDB connection`);
     if (!process.env.FRONTEND_URL) {
       console.warn(`⚠️  WARNING: FRONTEND_URL not set in production!`);
     }
   } else {
     console.log(`🔓 Development mode - allowing localhost origins`);
-    console.log(`🗄️  Database: Using MONGODB_URI`);
+    console.log(`🗄️  Database: Using development MongoDB connection`);
   }
 });
 
