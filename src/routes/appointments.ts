@@ -268,10 +268,20 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
     const { appointmentId } = req.params;
     const userId = req.user!.userId;
 
+    console.log(`🔄 Cancel request for appointment ${appointmentId} by user ${req.user!.email}`);
+
     if (!appointmentId) {
       return res.status(400).json({
         error: 'Appointment ID is required',
         code: 'MISSING_APPOINTMENT_ID'
+      });
+    }
+
+    // Validate MongoDB ObjectId format
+    if (!/^[0-9a-fA-F]{24}$/.test(appointmentId)) {
+      return res.status(400).json({
+        error: 'Invalid appointment ID format',
+        code: 'INVALID_APPOINTMENT_ID'
       });
     }
 
@@ -282,8 +292,111 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
     });
 
     if (!appointment) {
+      console.log(`❌ Appointment ${appointmentId} not found for user ${userId}`);
       return res.status(404).json({
-        error: 'Appointment not found',
+        error: 'Appointment not found or you do not have permission to cancel it',
+        code: 'APPOINTMENT_NOT_FOUND'
+      });
+    }
+
+    console.log(`📋 Found appointment: ${appointment.userName} on ${appointment.date} at ${appointment.time} (status: ${appointment.status})`);
+
+    // Check if appointment is already cancelled
+    if (appointment.status === 'cancelled') {
+      return res.status(400).json({
+        error: 'Appointment is already cancelled',
+        code: 'ALREADY_CANCELLED'
+      });
+    }
+
+    // Check if appointment can be cancelled (not in the past + buffer time)
+    const canCancel = (appointment as any).canBeCancelled();
+    console.log(`⏰ Can cancel appointment: ${canCancel}`);
+    
+    if (!canCancel) {
+      const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+      const now = new Date();
+      const timeDiff = appointmentDateTime.getTime() - now.getTime();
+      const hoursUntilAppointment = Math.floor(timeDiff / (1000 * 60 * 60));
+      
+      return res.status(400).json({
+        error: `Cannot cancel appointment. Less than 1 hour remaining (${hoursUntilAppointment} hours left)`,
+        code: 'CANCELLATION_TOO_LATE',
+        hoursUntilAppointment: hoursUntilAppointment
+      });
+    }
+
+    // Update appointment status
+    appointment.status = 'cancelled';
+    appointment.updatedAt = new Date();
+    await appointment.save();
+
+    console.log(`✅ Appointment cancelled successfully: ${appointment.userName} on ${appointment.date} at ${appointment.time}`);
+
+    res.json({
+      success: true,
+      message: 'Appointment cancelled successfully',
+      appointment: {
+        id: appointment._id,
+        date: appointment.date,
+        time: appointment.time,
+        status: appointment.status,
+        cancelledAt: appointment.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error cancelling appointment:', error);
+    
+    // Handle specific MongoDB errors
+    if ((error as any).name === 'CastError') {
+      return res.status(400).json({
+        error: 'Invalid appointment ID format',
+        code: 'INVALID_APPOINTMENT_ID'
+      });
+    }
+    
+    res.status(500).json({
+      error: 'Failed to cancel appointment',
+      code: 'CANCELLATION_ERROR',
+      details: process.env.NODE_ENV === 'development' ? (error as any).message : undefined
+    });
+  }
+});
+
+// Cancel appointment (DELETE method - alternative endpoint)
+router.delete('/:appointmentId', authenticateToken, async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    const userId = req.user!.userId;
+
+    console.log(`🗑️ Delete request for appointment ${appointmentId} by user ${req.user!.email}`);
+
+    if (!appointmentId) {
+      return res.status(400).json({
+        error: 'Appointment ID is required',
+        code: 'MISSING_APPOINTMENT_ID'
+      });
+    }
+
+    // Validate MongoDB ObjectId format
+    if (!/^[0-9a-fA-F]{24}$/.test(appointmentId)) {
+      return res.status(400).json({
+        error: 'Invalid appointment ID format',
+        code: 'INVALID_APPOINTMENT_ID'
+      });
+    }
+
+    // Find the appointment
+    const appointment = await Appointment.findOne({
+      _id: appointmentId,
+      userId: userId
+    });
+
+    if (!appointment) {
+      console.log(`❌ Appointment ${appointmentId} not found for user ${userId}`);
+      return res.status(404).json({
+        error: 'Appointment not found or you do not have permission to cancel it',
         code: 'APPOINTMENT_NOT_FOUND'
       });
     }
@@ -297,18 +410,27 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
     }
 
     // Check if appointment can be cancelled (not in the past + buffer time)
-    if (!(appointment as any).canBeCancelled()) {
+    const canCancel = (appointment as any).canBeCancelled();
+    
+    if (!canCancel) {
+      const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+      const now = new Date();
+      const timeDiff = appointmentDateTime.getTime() - now.getTime();
+      const hoursUntilAppointment = Math.floor(timeDiff / (1000 * 60 * 60));
+      
       return res.status(400).json({
-        error: 'Cannot cancel appointment less than 1 hour before scheduled time',
-        code: 'CANCELLATION_TOO_LATE'
+        error: `Cannot cancel appointment. Less than 1 hour remaining (${hoursUntilAppointment} hours left)`,
+        code: 'CANCELLATION_TOO_LATE',
+        hoursUntilAppointment: hoursUntilAppointment
       });
     }
 
     // Update appointment status
     appointment.status = 'cancelled';
+    appointment.updatedAt = new Date();
     await appointment.save();
 
-    console.log(`❌ Appointment cancelled: ${appointment.userName} on ${appointment.date} at ${appointment.time}`);
+    console.log(`✅ Appointment cancelled successfully via DELETE: ${appointment.userName} on ${appointment.date} at ${appointment.time}`);
 
     res.json({
       success: true,
@@ -317,15 +439,26 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
         id: appointment._id,
         date: appointment.date,
         time: appointment.time,
-        status: appointment.status
+        status: appointment.status,
+        cancelledAt: appointment.updatedAt
       }
     });
 
   } catch (error) {
-    console.error('Error cancelling appointment:', error);
+    console.error('❌ Error cancelling appointment via DELETE:', error);
+    
+    // Handle specific MongoDB errors
+    if ((error as any).name === 'CastError') {
+      return res.status(400).json({
+        error: 'Invalid appointment ID format',
+        code: 'INVALID_APPOINTMENT_ID'
+      });
+    }
+    
     res.status(500).json({
       error: 'Failed to cancel appointment',
-      code: 'CANCELLATION_ERROR'
+      code: 'CANCELLATION_ERROR',
+      details: process.env.NODE_ENV === 'development' ? (error as any).message : undefined
     });
   }
 });

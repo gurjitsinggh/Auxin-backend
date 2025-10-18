@@ -146,8 +146,8 @@ app.use(express.urlencoded({
 
 // Rate Limiting
 const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000000, // 15 minutes
+  max: 10000000000000, // Limit each IP to 100 requests per windowMs
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: '15 minutes'
@@ -160,8 +160,8 @@ const generalLimiter = rateLimit({
 
 // Stricter rate limiting for auth endpoints
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'development' ? 100 : 10, // More lenient in development
+  windowMs: 15 * 60 * 1000000, // 15 minutes
+  max: process.env.NODE_ENV === 'development' ? 1000000 : 10, // More lenient in development
   message: {
     error: 'Too many authentication attempts, please try again later.',
     retryAfter: '15 minutes'
