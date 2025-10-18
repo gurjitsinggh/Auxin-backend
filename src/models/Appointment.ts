@@ -122,11 +122,25 @@ AppointmentSchema.statics.generateTimeSlots = function() {
 AppointmentSchema.methods.canBeCancelled = function() {
   if (this.status === 'cancelled') return false;
   
-  const appointmentDateTime = new Date(`${this.date}T${this.time}`);
+  // Create proper date object with timezone handling
+  const dateStr = this.date instanceof Date ? 
+    this.date.toISOString().split('T')[0] : 
+    this.date;
+  const appointmentDateTime = new Date(`${dateStr}T${this.time}:00`);
   const now = new Date();
+  
+  console.log(`🔍 canBeCancelled - Appointment date: ${this.date}`);
+  console.log(`🔍 canBeCancelled - Appointment date type: ${typeof this.date}`);
+  console.log(`🔍 canBeCancelled - Date string: ${dateStr}`);
+  console.log(`🔍 canBeCancelled - Appointment time: ${this.time}`);
+  console.log(`🔍 canBeCancelled - Appointment datetime: ${appointmentDateTime}`);
+  console.log(`🔍 canBeCancelled - Current time: ${now}`);
   
   // Allow cancellation up to 1 hour before appointment
   const oneHourBefore = new Date(appointmentDateTime.getTime() - 60 * 60 * 1000);
+  
+  console.log(`🔍 canBeCancelled - One hour before: ${oneHourBefore}`);
+  console.log(`🔍 canBeCancelled - Can cancel: ${now < oneHourBefore}`);
   
   return now < oneHourBefore;
 };

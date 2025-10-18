@@ -269,8 +269,12 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
     const userId = req.user!.userId;
 
     console.log(`🔄 Cancel request for appointment ${appointmentId} by user ${req.user!.email}`);
+    console.log(`🔄 User ID: ${userId}`);
+    console.log(`🔄 Request method: ${req.method}`);
+    console.log(`🔄 Request URL: ${req.url}`);
 
     if (!appointmentId) {
+      console.log(`❌ No appointment ID provided`);
       return res.status(400).json({
         error: 'Appointment ID is required',
         code: 'MISSING_APPOINTMENT_ID'
@@ -300,6 +304,8 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
     }
 
     console.log(`📋 Found appointment: ${appointment.userName} on ${appointment.date} at ${appointment.time} (status: ${appointment.status})`);
+    console.log(`📋 Appointment ID: ${appointment._id}`);
+    console.log(`📋 User ID: ${appointment.userId}`);
 
     // Check if appointment is already cancelled
     if (appointment.status === 'cancelled') {
@@ -314,10 +320,23 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
     console.log(`⏰ Can cancel appointment: ${canCancel}`);
     
     if (!canCancel) {
-      const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+      // Create proper date object with timezone handling
+      const dateStr = appointment.date instanceof Date ? 
+        appointment.date.toISOString().split('T')[0] : 
+        appointment.date;
+      const appointmentDateTime = new Date(`${dateStr}T${appointment.time}:00`);
       const now = new Date();
       const timeDiff = appointmentDateTime.getTime() - now.getTime();
       const hoursUntilAppointment = Math.floor(timeDiff / (1000 * 60 * 60));
+      
+      console.log(`⏰ Appointment date: ${appointment.date}`);
+      console.log(`⏰ Appointment date type: ${typeof appointment.date}`);
+      console.log(`⏰ Date string: ${dateStr}`);
+      console.log(`⏰ Appointment time: ${appointment.time}`);
+      console.log(`⏰ Appointment datetime: ${appointmentDateTime}`);
+      console.log(`⏰ Current time: ${now}`);
+      console.log(`⏰ Time difference: ${timeDiff}ms`);
+      console.log(`⏰ Hours until appointment: ${hoursUntilAppointment}`);
       
       return res.status(400).json({
         error: `Cannot cancel appointment. Less than 1 hour remaining (${hoursUntilAppointment} hours left)`,
@@ -326,22 +345,109 @@ router.put('/:appointmentId/cancel', authenticateToken, async (req, res) => {
       });
     }
 
-    // Update appointment status
-    appointment.status = 'cancelled';
-    appointment.updatedAt = new Date();
-    await appointment.save();
+    // Delete the appointment instead of marking as cancelled
+    console.log(`🗑️ Deleting appointment ${appointmentId}...`);
+    console.log(`🗑️ Appointment before deletion:`, appointment);
+    
+    try {
+      // Double-check appointment exists before deletion
+      const preDeleteCheck = await Appointment.findById(appointmentId);
+      console.log(`🔍 Pre-deletion check - appointment exists:`, !!preDeleteCheck);
+      if (!preDeleteCheck) {
+        console.log(`❌ Appointment ${appointmentId} not found before deletion attempt`);
+        return res.status(404).json({
+          error: 'Appointment not found',
+          code: 'APPOINTMENT_NOT_FOUND'
+        });
+      }
+    } catch (preDeleteError) {
+      console.error(`❌ Pre-deletion check failed:`, preDeleteError);
+      return res.status(500).json({
+        error: 'Failed to verify appointment before deletion',
+        code: 'PRE_DELETE_CHECK_FAILED'
+      });
+    }
+    
+    // Try multiple deletion methods
+    let deleteResult = null;
+    
+    try {
+      // Method 1: Direct delete with user validation
+      try {
+        deleteResult = await Appointment.deleteOne({ _id: appointmentId, userId: userId });
+        console.log(`🗑️ deleteOne result:`, deleteResult);
+        console.log(`🗑️ deleteOne deletedCount:`, deleteResult.deletedCount);
+      } catch (error) {
+        console.error(`❌ deleteOne failed:`, error);
+      }
+      
+      // Method 2: findByIdAndDelete if first method failed
+      if (!deleteResult || deleteResult.deletedCount === 0) {
+        try {
+          deleteResult = await Appointment.findByIdAndDelete(appointmentId);
+          console.log(`🗑️ findByIdAndDelete result:`, deleteResult);
+        } catch (error) {
+          console.error(`❌ findByIdAndDelete failed:`, error);
+        }
+      }
+      
+      // Method 3: findOneAndDelete if both methods failed
+      if (!deleteResult || (deleteResult.deletedCount !== undefined && deleteResult.deletedCount === 0)) {
+        try {
+          deleteResult = await Appointment.findOneAndDelete({ _id: appointmentId, userId: userId });
+          console.log(`🗑️ findOneAndDelete result:`, deleteResult);
+        } catch (error) {
+          console.error(`❌ findOneAndDelete failed:`, error);
+        }
+      }
+    } catch (deletionError) {
+      console.error(`❌ All deletion methods failed:`, deletionError);
+      return res.status(500).json({
+        error: 'All deletion methods failed',
+        code: 'ALL_DELETION_METHODS_FAILED'
+      });
+    }
 
-    console.log(`✅ Appointment cancelled successfully: ${appointment.userName} on ${appointment.date} at ${appointment.time}`);
+    if (!deleteResult) {
+      console.log(`❌ Failed to delete appointment ${appointmentId}`);
+      return res.status(500).json({
+        error: 'Failed to delete appointment',
+        code: 'DELETE_FAILED'
+      });
+    }
+
+    // Check if deleteOne returned 0 deleted count
+    if (deleteResult.deletedCount !== undefined && deleteResult.deletedCount === 0) {
+      console.log(`❌ deleteOne returned 0 deleted count for appointment ${appointmentId}`);
+      return res.status(500).json({
+        error: 'Failed to delete appointment',
+        code: 'DELETE_FAILED'
+      });
+    }
+
+    // Verify deletion by trying to find the appointment again
+    const verifyDeletion = await Appointment.findById(appointmentId);
+    console.log(`🔍 Verification - appointment still exists:`, !!verifyDeletion);
+    
+    if (verifyDeletion) {
+      console.log(`❌ Appointment still exists after deletion attempt!`);
+      return res.status(500).json({
+        error: 'Appointment deletion failed - appointment still exists',
+        code: 'DELETION_VERIFICATION_FAILED'
+      });
+    }
+
+    console.log(`✅ Appointment deleted successfully: ${appointment.userName} on ${appointment.date} at ${appointment.time}`);
 
     res.json({
       success: true,
-      message: 'Appointment cancelled successfully',
+      message: 'Appointment cancelled and removed successfully',
       appointment: {
         id: appointment._id,
         date: appointment.date,
         time: appointment.time,
-        status: appointment.status,
-        cancelledAt: appointment.updatedAt
+        status: 'cancelled',
+        cancelledAt: new Date()
       }
     });
 
@@ -413,10 +519,23 @@ router.delete('/:appointmentId', authenticateToken, async (req, res) => {
     const canCancel = (appointment as any).canBeCancelled();
     
     if (!canCancel) {
-      const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+      // Create proper date object with timezone handling
+      const dateStr = appointment.date instanceof Date ? 
+        appointment.date.toISOString().split('T')[0] : 
+        appointment.date;
+      const appointmentDateTime = new Date(`${dateStr}T${appointment.time}:00`);
       const now = new Date();
       const timeDiff = appointmentDateTime.getTime() - now.getTime();
       const hoursUntilAppointment = Math.floor(timeDiff / (1000 * 60 * 60));
+      
+      console.log(`⏰ DELETE - Appointment date: ${appointment.date}`);
+      console.log(`⏰ DELETE - Appointment date type: ${typeof appointment.date}`);
+      console.log(`⏰ DELETE - Date string: ${dateStr}`);
+      console.log(`⏰ DELETE - Appointment time: ${appointment.time}`);
+      console.log(`⏰ DELETE - Appointment datetime: ${appointmentDateTime}`);
+      console.log(`⏰ DELETE - Current time: ${now}`);
+      console.log(`⏰ DELETE - Time difference: ${timeDiff}ms`);
+      console.log(`⏰ DELETE - Hours until appointment: ${hoursUntilAppointment}`);
       
       return res.status(400).json({
         error: `Cannot cancel appointment. Less than 1 hour remaining (${hoursUntilAppointment} hours left)`,
@@ -425,22 +544,82 @@ router.delete('/:appointmentId', authenticateToken, async (req, res) => {
       });
     }
 
-    // Update appointment status
-    appointment.status = 'cancelled';
-    appointment.updatedAt = new Date();
-    await appointment.save();
+    // Delete the appointment instead of marking as cancelled
+    console.log(`🗑️ DELETE method - Deleting appointment ${appointmentId}...`);
+    console.log(`🗑️ DELETE method - Appointment before deletion:`, appointment);
+    
+    // Try multiple deletion methods
+    let deleteResult = null;
+    
+    // Method 1: Direct delete with user validation
+    try {
+      deleteResult = await Appointment.deleteOne({ _id: appointmentId, userId: userId });
+      console.log(`🗑️ DELETE - deleteOne result:`, deleteResult);
+      console.log(`🗑️ DELETE - deleteOne deletedCount:`, deleteResult.deletedCount);
+    } catch (error) {
+      console.error(`❌ DELETE - deleteOne failed:`, error);
+    }
+    
+    // Method 2: findByIdAndDelete if first method failed
+    if (!deleteResult || deleteResult.deletedCount === 0) {
+      try {
+        deleteResult = await Appointment.findByIdAndDelete(appointmentId);
+        console.log(`🗑️ DELETE - findByIdAndDelete result:`, deleteResult);
+      } catch (error) {
+        console.error(`❌ DELETE - findByIdAndDelete failed:`, error);
+      }
+    }
+    
+    // Method 3: findOneAndDelete if both methods failed
+    if (!deleteResult || (deleteResult.deletedCount !== undefined && deleteResult.deletedCount === 0)) {
+      try {
+        deleteResult = await Appointment.findOneAndDelete({ _id: appointmentId, userId: userId });
+        console.log(`🗑️ DELETE - findOneAndDelete result:`, deleteResult);
+      } catch (error) {
+        console.error(`❌ DELETE - findOneAndDelete failed:`, error);
+      }
+    }
 
-    console.log(`✅ Appointment cancelled successfully via DELETE: ${appointment.userName} on ${appointment.date} at ${appointment.time}`);
+    if (!deleteResult) {
+      console.log(`❌ DELETE - Failed to delete appointment ${appointmentId}`);
+      return res.status(500).json({
+        error: 'Failed to delete appointment',
+        code: 'DELETE_FAILED'
+      });
+    }
+
+    // Check if deleteOne returned 0 deleted count
+    if (deleteResult.deletedCount !== undefined && deleteResult.deletedCount === 0) {
+      console.log(`❌ DELETE - deleteOne returned 0 deleted count for appointment ${appointmentId}`);
+      return res.status(500).json({
+        error: 'Failed to delete appointment',
+        code: 'DELETE_FAILED'
+      });
+    }
+
+    // Verify deletion by trying to find the appointment again
+    const verifyDeletion = await Appointment.findById(appointmentId);
+    console.log(`🔍 DELETE - Verification - appointment still exists:`, !!verifyDeletion);
+    
+    if (verifyDeletion) {
+      console.log(`❌ DELETE - Appointment still exists after deletion attempt!`);
+      return res.status(500).json({
+        error: 'Appointment deletion failed - appointment still exists',
+        code: 'DELETION_VERIFICATION_FAILED'
+      });
+    }
+
+    console.log(`✅ DELETE - Appointment deleted successfully: ${appointment.userName} on ${appointment.date} at ${appointment.time}`);
 
     res.json({
       success: true,
-      message: 'Appointment cancelled successfully',
+      message: 'Appointment cancelled and removed successfully',
       appointment: {
         id: appointment._id,
         date: appointment.date,
         time: appointment.time,
-        status: appointment.status,
-        cancelledAt: appointment.updatedAt
+        status: 'cancelled',
+        cancelledAt: new Date()
       }
     });
 
