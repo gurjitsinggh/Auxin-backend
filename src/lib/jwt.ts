@@ -1,11 +1,17 @@
 import jwt from 'jsonwebtoken';
 import { IUser } from '../models/User.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
+// Validate JWT_SECRET is set (critical for security)
+if (!JWT_SECRET) {
+  console.error('❌ JWT_SECRET environment variable is not set!');
+  throw new Error('JWT_SECRET environment variable is required for security');
+}
+
 // Ensure JWT_SECRET is a string
-const secretKey: string = typeof JWT_SECRET === 'string' ? JWT_SECRET : 'fallback-secret-key';
+const secretKey: string = typeof JWT_SECRET === 'string' ? JWT_SECRET : '';
 
 export interface JWTPayload {
   userId: string;
