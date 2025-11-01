@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import User from '../models/User.js';
+import PendingUser from '../models/PendingUser.js';
 import { generateToken } from '../lib/jwt.js';
 
 const router = Router();
@@ -45,19 +46,32 @@ router.post('/send-otp', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    // We now support both registered users and pending users
+    let user = await User.findOne({ email: normalizedEmail });
+    let pending = null as any;
     if (!user) {
-      console.log('❌ User not found for email:', email);
-      return res.status(404).json({ success: false, error: 'User not found' });
+      pending = await PendingUser.findOne({ email: normalizedEmail });
+      if (!pending) {
+        console.log('❌ No pending signup found for email:', normalizedEmail);
+        return res.status(404).json({ success: false, error: 'No signup found for this email' });
+      }
     }
 
     console.log('✅ User found, generating OTP code...');
     const code = crypto.randomInt(100000, 999999).toString();
-    const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expires = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
 
-    user.emailVerificationCode = code;
-    user.emailVerificationExpires = expires;
-    await user.save();
+    if (user) {
+      user.emailVerificationCode = code;
+      user.emailVerificationExpires = expires;
+      await user.save();
+    } else if (pending) {
+      pending.emailVerificationCode = code;
+      pending.emailVerificationExpires = expires;
+      await pending.save();
+    }
     console.log('✅ OTP code saved to database:', code);
 
     // IMPORTANT: Brevo requires the "from" email to be a verified sender in your Brevo account
@@ -123,7 +137,7 @@ router.post('/send-otp', async (req: Request, res: Response) => {
     try {
       const mailResult = await transporter.sendMail({
         from: `Auxin <${from}>`,
-        to: email,
+        to: normalizedEmail,
         subject: 'Your Auxin Verification Code',
         html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto">
                 <div style="background:#000;padding:20px;text-align:center">
@@ -135,7 +149,7 @@ router.post('/send-otp', async (req: Request, res: Response) => {
                   <div style="background:#f5f5f5;border:2px solid #39FF14;padding:20px;text-align:center;margin:30px 0;border-radius:8px">
                     <div style="font-size:32px;letter-spacing:12px;font-weight:bold;color:#39FF14;font-family:'Courier New',monospace">${code}</div>
                   </div>
-                  <p style="color:#666;font-size:14px">This code will expire in 10 minutes.</p>
+                  <p style="color:#666;font-size:14px">This code will expire in 2 minutes.</p>
                   <p style="color:#999;font-size:12px;margin-top:30px;padding-top:20px;border-top:1px solid #eee">If you didn't create an account with Auxin, please ignore this email.</p>
                 </div>
               </div>`,
@@ -175,20 +189,33 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Email and code are required' });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    let user = await User.findOne({ email: normalizedEmail });
+    let pending = null as any;
     if (!user) {
-      console.log('❌ User not found for email:', email);
-      return res.status(404).json({ success: false, error: 'User not found' });
+      pending = await PendingUser.findOne({ email: normalizedEmail });
+      if (!pending) {
+        console.log('❌ No user or pending signup found for email:', normalizedEmail);
+        return res.status(404).json({ success: false, error: 'No active verification code. Please request a new code.' });
+      }
     }
 
-    console.log('✅ User found:', {
-      isEmailVerified: user.isEmailVerified,
-      hasVerificationCode: !!user.emailVerificationCode,
-      verificationCode: user.emailVerificationCode ? '***' : 'none',
-      expires: user.emailVerificationExpires
-    });
+    if (user) {
+      console.log('✅ User found:', {
+        isEmailVerified: user.isEmailVerified,
+        hasVerificationCode: !!user.emailVerificationCode,
+        verificationCode: user.emailVerificationCode ? '***' : 'none',
+        expires: user.emailVerificationExpires
+      });
+    } else if (pending) {
+      console.log('✅ Pending user found:', {
+        hasVerificationCode: !!pending.emailVerificationCode,
+        verificationCode: pending.emailVerificationCode ? '***' : 'none',
+        expires: pending.emailVerificationExpires
+      });
+    }
 
-    if (user.isEmailVerified) {
+    if (user && user.isEmailVerified) {
       console.log('✅ User already verified, generating token...');
       // Already verified - return token anyway
       const token = generateToken(user);
@@ -205,7 +232,9 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       });
     }
 
-    if (!user.emailVerificationCode || !user.emailVerificationExpires) {
+    const storedCode = user ? user.emailVerificationCode : pending?.emailVerificationCode;
+    const storedExpires = user ? user.emailVerificationExpires : pending?.emailVerificationExpires;
+    if (!storedCode || !storedExpires) {
       console.log('❌ No active verification code found');
       return res.status(400).json({ 
         success: false, 
@@ -213,8 +242,8 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       });
     }
 
-    const isExpired = new Date(user.emailVerificationExpires).getTime() < Date.now();
-    const codeMatches = String(user.emailVerificationCode) === String(code);
+    const isExpired = new Date(storedExpires).getTime() < Date.now();
+    const codeMatches = String(storedCode) === String(code);
     
     console.log('🔍 Code verification:', {
       isExpired,
@@ -231,10 +260,23 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: errorMsg });
     }
 
-    user.isEmailVerified = true;
-    user.emailVerificationCode = undefined;
-    user.emailVerificationExpires = undefined;
-    await user.save();
+    if (user) {
+      user.isEmailVerified = true;
+      user.emailVerificationCode = undefined;
+      user.emailVerificationExpires = undefined;
+      await user.save();
+    } else if (pending) {
+      // Create real user from pending record
+      const created = new User({
+        name: pending.name,
+        email: pending.email,
+        password: pending.password,
+        isEmailVerified: true
+      });
+      await created.save();
+      await pending.deleteOne();
+      user = created;
+    }
 
     // Generate token and return user data
     const token = generateToken(user);

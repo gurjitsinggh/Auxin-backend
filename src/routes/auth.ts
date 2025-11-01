@@ -1,5 +1,7 @@
 import express from 'express';
 import User from '../models/User.js';
+import PendingUser from '../models/PendingUser.js';
+import PendingUser from '../models/PendingUser.js';
 import { generateToken, verifyToken } from '../lib/jwt.js';
 import { getGoogleAuthURL, getGoogleUserInfo } from '../lib/googleAuth.js';
 
@@ -21,26 +23,34 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists with this email' });
     }
 
-    // Create user with plain text password (unverified)
-    const user = new User({
-      name,
-      email,
-      password: password, // Store plain text password
-      isEmailVerified: false
-    });
+    // Upsert a pending user record instead of creating a real user
+    const pending = await PendingUser.findOneAndUpdate(
+      { email: normalizedEmail },
+      {
+        $set: {
+          name,
+          email: normalizedEmail,
+          password
+        },
+        $unset: { emailVerificationCode: 1, emailVerificationExpires: 1 }
+      },
+      { upsert: true, new: true }
+    );
 
-    await user.save();
+    console.log('✅ Pending signup stored for', normalizedEmail, { id: pending._id });
 
-    // Don't generate token yet - user needs to verify email first
+    // Do not send OTP here; the client triggers /send-otp from verify page
     res.status(201).json({
-      message: 'User created successfully. Please verify your email.',
-      email: user.email,
+      message: 'Signup started. Please verify your email.',
+      email: normalizedEmail,
       requiresVerification: true
     });
   } catch (error) {
@@ -67,10 +77,18 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     // Find user
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      console.log('❌ Login failed: User not found for email:', email);
+      // If a pending signup exists and password matches, prompt verification
+      const pending = await PendingUser.findOne({ email: normalizedEmail });
+      if (pending && pending.password === password) {
+        console.log('⚠️ Login blocked: pending user must verify email first:', normalizedEmail);
+        return res.status(403).json({ error: 'Email not verified', requiresVerification: true, email: normalizedEmail });
+      }
+      console.log('❌ Login failed: User not found for email:', normalizedEmail);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -93,6 +111,12 @@ router.post('/login', async (req, res) => {
     if (user.password !== password) {
       console.log('❌ Login failed: Invalid password for email:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Block login if email not verified
+    if (!user.isEmailVerified) {
+      console.log('⚠️ Login blocked: email not verified for', normalizedEmail);
+      return res.status(403).json({ error: 'Email not verified', requiresVerification: true, email: normalizedEmail });
     }
 
     console.log('✅ Login successful for email:', email);
