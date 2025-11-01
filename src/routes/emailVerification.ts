@@ -6,16 +6,24 @@ import { generateToken } from '../lib/jwt.js';
 
 const router = Router();
 
-// Create a transport using environment variables with Brevo defaults
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// Get transporter with lazy evaluation (loads env vars at runtime)
+const getTransporter = () => {
+  console.log('🔍 SMTP Environment Variables Check:');
+  console.log('   SMTP_HOST:', process.env.SMTP_HOST || 'NOT SET');
+  console.log('   SMTP_PORT:', process.env.SMTP_PORT || 'NOT SET');
+  console.log('   SMTP_USER:', process.env.SMTP_USER ? 'SET (' + process.env.SMTP_USER.substring(0, 20) + '...)' : 'NOT SET');
+  console.log('   SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT SET');
+  
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false, // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+};
 
 // POST /send-otp
 router.post('/send-otp', async (req: Request, res: Response) => {
@@ -100,6 +108,9 @@ router.post('/send-otp', async (req: Request, res: Response) => {
       from: from
     });
 
+    // Get transporter instance
+    const transporter = getTransporter();
+    
     // Verify SMTP connection first
     try {
       await transporter.verify();

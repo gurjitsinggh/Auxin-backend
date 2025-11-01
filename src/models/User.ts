@@ -8,6 +8,8 @@ export interface IUser extends Document {
   googleId?: string;
   avatar?: string;
   isEmailVerified: boolean;
+  emailVerificationCode?: string;
+  emailVerificationExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +42,12 @@ const UserSchema = new Schema<IUser>({
   isEmailVerified: {
     type: Boolean,
     default: false
+  },
+  emailVerificationCode: {
+    type: String
+  },
+  emailVerificationExpires: {
+    type: Date
   }
 }, {
   timestamps: true,

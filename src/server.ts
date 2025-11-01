@@ -1,6 +1,6 @@
 // Load environment variables FIRST
 import dotenv from 'dotenv';
-dotenv.config({ quiet: true });
+dotenv.config({ path: '.env', debug: false });
 
 import express from 'express';
 import cors from 'cors';
@@ -10,6 +10,7 @@ import xss from 'xss';
 import connectDB from './lib/mongodb.js';
 import authRoutes from './routes/auth.js';
 import appointmentRoutes from './routes/appointments.js';
+import emailVerificationRoutes from './routes/emailVerification.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,13 +21,16 @@ const isProduction = process.env.NODE_ENV === 'production';
 const allowedOrigins = [
   // Always include the configured frontend URL
   process.env.FRONTEND_URL || (isProduction ? 'https://auxin.media' : 'http://localhost:5173'),
-  // Only include development origins in non-production
-  ...(isProduction ? [] : ['http://localhost:3000', 'http://localhost:5173']),
-  // Add any additional production domains
+  // Always allow local dev origins to call the API (useful when testing prod API from local Vite)
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  // Additional origins from env (comma-separated)
   ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
   // Explicitly include auxin.media for production
   ...(isProduction ? ['https://auxin.media'] : [])
-].filter(Boolean); // Remove null values
+].filter(Boolean);
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
@@ -181,7 +185,11 @@ connectDB();
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/appointments', appointmentRoutes);
 
-// Add direct auth routes (without /api prefix) for OAuth redirects
+// Email verification endpoints (mount under both to support clients using either prefix)
+app.use('/auth', emailVerificationRoutes);
+app.use('/api/auth', emailVerificationRoutes);
+
+// Add direct auth routes (without /api prefix) for OAuth/login/register
 app.use('/auth', authLimiter, authRoutes);
 
 // Health check

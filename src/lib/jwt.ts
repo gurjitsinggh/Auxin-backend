@@ -1,17 +1,17 @@
 import jwt from 'jsonwebtoken';
 import { IUser } from '../models/User.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+// Get JWT_SECRET with lazy evaluation
+const getJWTSecret = (): string => {
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+    console.error('❌ JWT_SECRET environment variable is not set!');
+    throw new Error('JWT_SECRET environment variable is required for security');
+  }
+  return JWT_SECRET;
+};
+
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-
-// Validate JWT_SECRET is set (critical for security)
-if (!JWT_SECRET) {
-  console.error('❌ JWT_SECRET environment variable is not set!');
-  throw new Error('JWT_SECRET environment variable is required for security');
-}
-
-// Ensure JWT_SECRET is a string
-const secretKey: string = typeof JWT_SECRET === 'string' ? JWT_SECRET : '';
 
 export interface JWTPayload {
   userId: string;
@@ -26,12 +26,14 @@ export const generateToken = (user: IUser): string => {
     email: user.email
   };
 
+  const secretKey = getJWTSecret();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return jwt.sign(payload, secretKey, { expiresIn: JWT_EXPIRES_IN } as any);
 };
 
 export const verifyToken = (token: string): JWTPayload => {
   try {
+    const secretKey = getJWTSecret();
     return jwt.verify(token, secretKey) as JWTPayload;
   } catch {
     throw new Error('Invalid or expired token');
@@ -44,6 +46,7 @@ export const generateRefreshToken = (user: IUser): string => {
     type: 'refresh'
   };
 
+  const secretKey = getJWTSecret();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return jwt.sign(payload, secretKey, { expiresIn: '30d' } as any);
 };

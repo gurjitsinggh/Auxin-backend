@@ -27,7 +27,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'User already exists with this email' });
     }
 
-    // Create user with plain text password
+    // Create user with plain text password (unverified)
     const user = new User({
       name,
       email,
@@ -37,19 +37,11 @@ router.post('/register', async (req, res) => {
 
     await user.save();
 
-    // Generate token
-    const token = generateToken(user);
-
+    // Don't generate token yet - user needs to verify email first
     res.status(201).json({
-      message: 'User created successfully',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        isEmailVerified: user.isEmailVerified
-      }
+      message: 'User created successfully. Please verify your email.',
+      email: user.email,
+      requiresVerification: true
     });
   } catch (error) {
     console.error('Registration error:', error);
